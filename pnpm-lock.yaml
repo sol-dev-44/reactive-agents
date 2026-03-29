@@ -26,10 +26,10 @@ importers:
 
   examples/research-pipeline:
     dependencies:
-      '@reactive-agents/anthropic':
+      '@reactive-agent/anthropic':
         specifier: workspace:*
         version: link:../../packages/anthropic
-      '@reactive-agents/core':
+      '@reactive-agent/core':
         specifier: workspace:*
         version: link:../../packages/core
     devDependencies:
@@ -46,7 +46,7 @@ importers:
         specifier: ^0.39.0
         version: 0.39.0
     devDependencies:
-      '@reactive-agents/core':
+      '@reactive-agent/core':
         specifier: workspace:*
         version: link:../core
       tsup:
@@ -73,7 +73,7 @@ importers:
 
   packages/react:
     devDependencies:
-      '@reactive-agents/core':
+      '@reactive-agent/core':
         specifier: workspace:*
         version: link:../core
       '@testing-library/react':
