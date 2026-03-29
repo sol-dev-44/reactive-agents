@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { StreamEvent, ToolCall } from "@reactive-agents/core";
+import type { StreamEvent, ToolCall } from "@reactive-agent/core";
 
 /**
  * Convert an Anthropic MessageStream (AsyncIterable<RawMessageStreamEvent>)

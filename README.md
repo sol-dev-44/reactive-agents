@@ -12,17 +12,17 @@ Every team building with LLMs writes the same boilerplate: caching, retries, dep
 - **Built-in caching** — input hashing, TTL, LRU eviction. Same question = cached answer. Zero wasted tokens.
 - **DAG execution** — agents run in the optimal order with maximum parallelism. No manual orchestration.
 - **Type-safe** — full TypeScript generics, discriminated unions, strict mode. No `any`.
-- **Zero dependencies** — `@reactive-agents/core` has zero production dependencies.
+- **Zero dependencies** — `@reactive-agent/core` has zero production dependencies.
 
 ## Quick Start
 
 ```bash
-npm install @reactive-agents/core @reactive-agents/anthropic
+npm install @reactive-agent/core @reactive-agent/anthropic
 ```
 
 ```typescript
-import { createAgentApi } from "@reactive-agents/core";
-import { createAnthropicProvider } from "@reactive-agents/anthropic";
+import { createAgentApi } from "@reactive-agent/core";
+import { createAnthropicProvider } from "@reactive-agent/anthropic";
 
 const api = createAgentApi({
   name: "my-app",
@@ -223,11 +223,11 @@ for await (const event of api.stream("reporter", analysisData)) {
 ## React Hooks
 
 ```bash
-npm install @reactive-agents/react
+npm install @reactive-agent/react
 ```
 
 ```tsx
-import { AgentApiProvider, useAgent, useAgentResult } from "@reactive-agents/react";
+import { AgentApiProvider, useAgent, useAgentResult } from "@reactive-agent/react";
 
 // Wrap your app
 function App() {
@@ -327,7 +327,7 @@ All errors extend `ReactiveAgentsError` with a `code` property:
 | `TimeoutError` | `TIMEOUT` | Agent execution timed out |
 
 ```typescript
-import { ReactiveAgentsError } from "@reactive-agents/core";
+import { ReactiveAgentsError } from "@reactive-agent/core";
 
 try {
   await api.execute("researcher", "quantum computing");
@@ -342,9 +342,9 @@ try {
 
 | Package | Description | Dependencies |
 |---------|-------------|--------------|
-| `@reactive-agents/core` | Engine, cache, DAG, tags | Zero |
-| `@reactive-agents/anthropic` | Claude adapter | `@anthropic-ai/sdk` |
-| `@reactive-agents/react` | React hooks | `react` |
+| `@reactive-agent/core` | Engine, cache, DAG, tags | Zero |
+| `@reactive-agent/anthropic` | Claude adapter | `@anthropic-ai/sdk` |
+| `@reactive-agent/react` | React hooks | `react` |
 
 ## Examples
 

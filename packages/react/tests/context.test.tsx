@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
-import type { AgentApi } from "@reactive-agents/core";
+import type { AgentApi } from "@reactive-agent/core";
 import { AgentApiProvider, useAgentApi } from "../src/context.js";
 
 function createMockApi(): AgentApi {

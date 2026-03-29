@@ -8,8 +8,8 @@
     "build": "echo 'no build needed'"
   },
   "dependencies": {
-    "@reactive-agents/core": "workspace:*",
-    "@reactive-agents/anthropic": "workspace:*"
+    "@reactive-agent/core": "workspace:*",
+    "@reactive-agent/anthropic": "workspace:*"
   },
   "devDependencies": {
     "tsx": "^4.0.0",

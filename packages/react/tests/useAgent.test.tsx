@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import type { AgentApi, AgentResult, StreamEvent } from "@reactive-agents/core";
+import type { AgentApi, AgentResult, StreamEvent } from "@reactive-agent/core";
 import { AgentApiProvider } from "../src/context.js";
 import { useAgent } from "../src/useAgent.js";
 

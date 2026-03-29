@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
-import type { AgentApi, CacheEntry } from "@reactive-agents/core";
+import type { AgentApi, CacheEntry } from "@reactive-agent/core";
 import { AgentApiProvider } from "../src/context.js";
 import { useAgentResult } from "../src/useAgentResult.js";
 

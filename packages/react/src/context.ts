@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { AgentApi } from "@reactive-agents/core";
+import type { AgentApi } from "@reactive-agent/core";
 
 /**
  * React context for providing an AgentApi instance to the component tree.

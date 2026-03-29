@@ -1,4 +1,4 @@
-import type { AgentResult, StreamEvent } from "@reactive-agents/core";
+import type { AgentResult, StreamEvent } from "@reactive-agent/core";
 
 /**
  * Options for the useAgent hook.

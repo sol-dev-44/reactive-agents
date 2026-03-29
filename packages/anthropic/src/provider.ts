@@ -6,7 +6,7 @@ import type {
   StreamEvent,
   TokenUsage,
   ToolCall,
-} from "@reactive-agents/core";
+} from "@reactive-agent/core";
 import { formatMessages, formatTools } from "./messages.js";
 import { mapStreamEvents } from "./streaming.js";
 import { wrapError } from "./errors.js";
@@ -94,7 +94,7 @@ function mapStopReason(
  *
  * @example
  * ```ts
- * import { createAnthropicProvider } from "@reactive-agents/anthropic";
+ * import { createAnthropicProvider } from "@reactive-agent/anthropic";
  *
  * const provider = createAnthropicProvider({ apiKey: "sk-ant-..." });
  * // or let it read ANTHROPIC_API_KEY from env:

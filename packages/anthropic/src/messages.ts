@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { AgentMessage, ToolDefinition } from "@reactive-agents/core";
+import type { AgentMessage, ToolDefinition } from "@reactive-agent/core";
 
 /**
  * Anthropic MessageParam — the format the SDK expects for messages.

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import type { AgentResult, StreamEvent } from "@reactive-agents/core";
+import type { AgentResult, StreamEvent } from "@reactive-agent/core";
 import { useAgentApi } from "./context.js";
 import type { UseAgentOptions, UseAgentReturn } from "./types.js";
 

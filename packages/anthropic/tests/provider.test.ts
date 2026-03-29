@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { ProviderExecuteParams, StreamEvent } from "@reactive-agents/core";
+import type { ProviderExecuteParams, StreamEvent } from "@reactive-agent/core";
 
 // ============================================================
 // Mock the Anthropic SDK — must be before the provider import

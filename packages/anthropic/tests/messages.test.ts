@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { AgentMessage, ToolDefinition } from "@reactive-agents/core";
+import type { AgentMessage, ToolDefinition } from "@reactive-agent/core";
 import { formatMessages, formatTools } from "../src/messages.js";
 
 // ============================================================
