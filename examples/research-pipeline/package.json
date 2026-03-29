@@ -1,0 +1,18 @@
+{
+  "name": "research-pipeline-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "echo 'no build needed'"
+  },
+  "dependencies": {
+    "@reactive-agents/core": "workspace:*",
+    "@reactive-agents/anthropic": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0"
+  }
+}
