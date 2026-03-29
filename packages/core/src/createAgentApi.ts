@@ -35,6 +35,8 @@ export function createAgentApi(config: AgentApiConfig): AgentApi {
       engine.stream(agentName, input),
     executePipeline: (agentNames, initialInput, options) =>
       engine.executePipeline(agentNames, initialInput, options),
+    streamPipeline: (agentNames, initialInput, options) =>
+      engine.streamPipeline(agentNames, initialInput, options),
     getExecutionPlan: (agentNames) =>
       buildExecutionPlan(agentNames, config.agents),
     invalidateTags: (tags: Tag[]) => cache.invalidate(tags),

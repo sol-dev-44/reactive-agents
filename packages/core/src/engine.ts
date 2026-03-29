@@ -26,6 +26,8 @@ import type {
   StreamEvent,
   PipelineOptions,
   PipelineResult,
+  PipelineStreamEvent,
+  PipelineStreamOptions,
   ToolDefinition,
 } from "./types.js";
 import type { CacheManager } from "./cache.js";
@@ -344,6 +346,200 @@ export class ExecutionEngine {
       finalResult: results[lastAgentName],
       totalDurationMs: Date.now() - startTime,
       totalUsage,
+    };
+  }
+
+  async *streamPipeline(
+    agentNames: string[],
+    initialInput: unknown,
+    options: PipelineStreamOptions = {},
+  ): AsyncGenerator<PipelineStreamEvent> {
+    const startTime = Date.now();
+    const plan = buildExecutionPlan(agentNames, this.config.agents);
+    const results: Record<string, AgentResult<unknown>> = {};
+    const chainOutputs = options.chainOutputs ?? true;
+
+    yield { type: "plan", plan };
+
+    // Group steps by parallelGroup (wave)
+    const groups = new Map<number, string[]>();
+    for (const step of plan.steps) {
+      const group = groups.get(step.parallelGroup) ?? [];
+      group.push(step.agentName);
+      groups.set(step.parallelGroup, group);
+    }
+
+    let lastOutput: unknown = initialInput;
+
+    for (let g = 0; g < plan.totalGroups; g++) {
+      const groupAgents = groups.get(g) ?? [];
+      yield { type: "wave_start", wave: g, agents: groupAgents };
+
+      // Event buffer for merging concurrent agent streams
+      const buffer: PipelineStreamEvent[] = [];
+      let resolveWaiter: (() => void) | null = null;
+      const errors: Record<string, Error> = {};
+
+      const emit = (event: PipelineStreamEvent) => {
+        buffer.push(event);
+        resolveWaiter?.();
+      };
+
+      const runAgent = async (name: string) => {
+        try {
+          const agentConfig = this.config.agents[name];
+          if (!agentConfig) throw new AgentNotFoundError(name);
+
+          const input = options.buildInput
+            ? options.buildInput(name, results, initialInput)
+            : options.inputOverrides?.[name] ??
+              (chainOutputs ? lastOutput : initialInput);
+
+          // Check cache
+          const cacheKey = await this.config.cache.getKey(name, input);
+          const cached = this.config.cache.get(cacheKey);
+
+          if (cached) {
+            this.config.onCacheHit?.(name, cacheKey);
+            const result: AgentResult<unknown> = {
+              data: cached.result,
+              raw: String(cached.result),
+              fromCache: true,
+              usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+              durationMs: 0,
+              agentName: name,
+              timestamp: Date.now(),
+              tags: cached.tags,
+            };
+            emit({ type: "cache_hit", agent: name, result });
+            emit({ type: "agent_complete", agent: name, result });
+            results[name] = result;
+            options.onStepComplete?.(name, result);
+            return;
+          }
+
+          const agentStartTime = Date.now();
+          this.config.onExecutionStart?.(name, input);
+          emit({ type: "agent_start", agent: name });
+
+          // Stream the agent
+          let accumulated = "";
+          for await (const ev of this.stream(name, input)) {
+            if (ev.type === "text_delta" && ev.text) {
+              accumulated += ev.text;
+              emit({ type: "text_delta", agent: name, text: ev.text });
+            }
+          }
+
+          // Build result
+          const parsed = agentConfig.parseResult
+            ? agentConfig.parseResult(accumulated)
+            : accumulated;
+
+          const tags =
+            typeof agentConfig.providesTags === "function"
+              ? agentConfig.providesTags(parsed).map(normalizeTag)
+              : (agentConfig.providesTags ?? []).map(normalizeTag);
+
+          const result: AgentResult<unknown> = {
+            data: parsed,
+            raw: accumulated,
+            fromCache: false,
+            usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+            durationMs: Date.now() - agentStartTime,
+            agentName: name,
+            timestamp: Date.now(),
+            tags,
+          };
+
+          // Cache the result
+          const ttl = agentConfig.cacheTtl ?? this.config.defaultCacheTtl;
+          if (ttl > 0) {
+            this.config.cache.set(cacheKey, {
+              result: parsed,
+              cachedAt: Date.now(),
+              expiresAt: Date.now() + ttl,
+              inputHash: cacheKey,
+              tags,
+              usage: result.usage,
+            });
+          }
+
+          // Invalidate downstream caches
+          if (agentConfig.invalidatesTags) {
+            const invTags =
+              typeof agentConfig.invalidatesTags === "function"
+                ? agentConfig.invalidatesTags(input)
+                : agentConfig.invalidatesTags;
+            this.config.cache.invalidate(invTags);
+          }
+
+          this.config.onExecutionComplete?.(name, result);
+          emit({ type: "agent_complete", agent: name, result });
+          results[name] = result;
+          options.onStepComplete?.(name, result);
+        } catch (err) {
+          const error = err instanceof Error ? err : new Error(String(err));
+          this.config.onError?.(name, error);
+          emit({ type: "error", agent: name, error });
+          errors[name] = error;
+        }
+      };
+
+      // Start all agents in wave concurrently
+      const promises = groupAgents.map(runAgent);
+      let allDone = false;
+
+      Promise.all(promises).then(() => {
+        allDone = true;
+        resolveWaiter?.();
+      });
+
+      // Drain events as they arrive
+      while (!allDone || buffer.length > 0) {
+        if (buffer.length > 0) {
+          yield buffer.shift()!;
+        } else if (!allDone) {
+          await new Promise<void>((r) => {
+            resolveWaiter = r;
+          });
+          resolveWaiter = null;
+        }
+      }
+
+      // If any agent in the wave failed, stop the pipeline
+      const errorNames = Object.keys(errors);
+      if (errorNames.length > 0) {
+        throw errors[errorNames[0]!];
+      }
+
+      // Update lastOutput for chaining to next wave
+      for (const name of groupAgents) {
+        if (results[name]) {
+          lastOutput = results[name]!.data;
+        }
+      }
+
+      yield { type: "wave_complete", wave: g };
+    }
+
+    // Compute total usage
+    const totalUsage: TokenUsage = {
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+    };
+    for (const r of Object.values(results)) {
+      totalUsage.inputTokens += r.usage.inputTokens;
+      totalUsage.outputTokens += r.usage.outputTokens;
+      totalUsage.totalTokens += r.usage.totalTokens;
+    }
+
+    yield {
+      type: "complete",
+      results,
+      totalUsage,
+      totalDurationMs: Date.now() - startTime,
     };
   }
 

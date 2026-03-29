@@ -12,6 +12,7 @@ import type {
   ProviderExecuteParams,
   ProviderExecuteResult,
   StreamEvent,
+  PipelineStreamEvent,
   AgentConfig,
   TokenUsage,
 } from "../src/types.js";
@@ -750,6 +751,267 @@ describe("ExecutionEngine", () => {
       usage1.totalTokens = 999;
       const usage2 = engine.getUsage();
       expect(usage2.totalTokens).not.toBe(999);
+    });
+  });
+
+  // --------------------------------------------------------
+  // streamPipeline
+  // --------------------------------------------------------
+
+  describe("streamPipeline", () => {
+    async function collectEvents(
+      gen: AsyncIterable<PipelineStreamEvent>,
+    ): Promise<PipelineStreamEvent[]> {
+      const events: PipelineStreamEvent[] = [];
+      for await (const ev of gen) {
+        events.push(ev);
+      }
+      return events;
+    }
+
+    it("should emit plan, wave, agent, and complete events for a sequential pipeline", async () => {
+      config.agents.a = makeAgent({ name: "a", providesTags: ["StepA"] });
+      config.agents.b = makeAgent({ name: "b", invalidatesTags: ["StepA"] });
+      engine = new ExecutionEngine(config);
+
+      const events = await collectEvents(
+        engine.streamPipeline(["a", "b"], "hello"),
+      );
+
+      const types = events.map((e) => e.type);
+      expect(types).toEqual([
+        "plan",
+        "wave_start",
+        "agent_start",
+        "text_delta",
+        "text_delta",
+        "agent_complete",
+        "wave_complete",
+        "wave_start",
+        "agent_start",
+        "text_delta",
+        "text_delta",
+        "agent_complete",
+        "wave_complete",
+        "complete",
+      ]);
+    });
+
+    it("should stream text_delta events with agent name", async () => {
+      config.agents.a = makeAgent({ name: "a" });
+      engine = new ExecutionEngine(config);
+
+      const events = await collectEvents(
+        engine.streamPipeline(["a"], "input"),
+      );
+
+      const textEvents = events.filter((e) => e.type === "text_delta");
+      expect(textEvents).toEqual([
+        { type: "text_delta", agent: "a", text: "hello " },
+        { type: "text_delta", agent: "a", text: "world" },
+      ]);
+    });
+
+    it("should emit agent_complete with accumulated result", async () => {
+      config.agents.a = makeAgent({ name: "a" });
+      engine = new ExecutionEngine(config);
+
+      const events = await collectEvents(
+        engine.streamPipeline(["a"], "input"),
+      );
+
+      const done = events.find((e) => e.type === "agent_complete");
+      expect(done).toBeDefined();
+      expect(done!.type === "agent_complete" && done!.result.data).toBe(
+        "hello world",
+      );
+      expect(done!.type === "agent_complete" && done!.result.raw).toBe(
+        "hello world",
+      );
+      expect(
+        done!.type === "agent_complete" && done!.result.fromCache,
+      ).toBe(false);
+    });
+
+    it("should run parallel agents in the same wave", async () => {
+      config.agents.a = makeAgent({ name: "a" });
+      config.agents.b = makeAgent({ name: "b" });
+      // No tag deps → same parallel group
+      engine = new ExecutionEngine(config);
+
+      const events = await collectEvents(
+        engine.streamPipeline(["a", "b"], "input"),
+      );
+
+      // Should be 1 wave with both agents
+      const waveStarts = events.filter((e) => e.type === "wave_start");
+      expect(waveStarts).toHaveLength(1);
+      expect(
+        waveStarts[0]!.type === "wave_start" && waveStarts[0]!.agents,
+      ).toEqual(expect.arrayContaining(["a", "b"]));
+    });
+
+    it("should chain output from previous wave to next wave", async () => {
+      // a (wave 0) → b (wave 1)
+      config.agents.a = makeAgent({ name: "a", providesTags: ["StepA"] });
+      config.agents.b = makeAgent({ name: "b", invalidatesTags: ["StepA"] });
+
+      // Track what input b receives
+      let bInput: unknown;
+      const originalStream = config.provider.stream;
+      config.provider.stream = async function* (params) {
+        // Check if this is agent b by looking at system prompt
+        if (params.messages[0]?.content === "hello world") {
+          bInput = params.messages[0].content;
+        }
+        yield* originalStream(params);
+      };
+      engine = new ExecutionEngine(config);
+
+      await collectEvents(engine.streamPipeline(["a", "b"], "initial"));
+
+      // b should receive a's accumulated output
+      expect(bInput).toBe("hello world");
+    });
+
+    it("should emit cache_hit for cached agents", async () => {
+      config.agents.a = makeAgent({ name: "a" });
+      engine = new ExecutionEngine(config);
+
+      // First run — populates cache (streamPipeline caches results)
+      await collectEvents(engine.streamPipeline(["a"], "input"));
+
+      // Second run — should hit cache
+      const events = await collectEvents(
+        engine.streamPipeline(["a"], "input"),
+      );
+
+      const cacheHit = events.find((e) => e.type === "cache_hit");
+      expect(cacheHit).toBeDefined();
+      expect(
+        cacheHit!.type === "cache_hit" && cacheHit!.result.fromCache,
+      ).toBe(true);
+
+      // Should NOT have text_delta events (served from cache)
+      const textEvents = events.filter((e) => e.type === "text_delta");
+      expect(textEvents).toHaveLength(0);
+    });
+
+    it("should fire onExecutionStart and onExecutionComplete callbacks", async () => {
+      const onStart = vi.fn();
+      const onComplete = vi.fn();
+      config.onExecutionStart = onStart;
+      config.onExecutionComplete = onComplete;
+      config.agents.a = makeAgent({ name: "a" });
+      engine = new ExecutionEngine(config);
+
+      await collectEvents(engine.streamPipeline(["a"], "input"));
+
+      expect(onStart).toHaveBeenCalledWith("a", "input");
+      expect(onComplete).toHaveBeenCalledWith(
+        "a",
+        expect.objectContaining({ agentName: "a" }),
+      );
+    });
+
+    it("should fire onCacheHit callback for cached agents", async () => {
+      const onCacheHit = vi.fn();
+      config.onCacheHit = onCacheHit;
+      config.agents.a = makeAgent({ name: "a" });
+      engine = new ExecutionEngine(config);
+
+      await collectEvents(engine.streamPipeline(["a"], "input"));
+      expect(onCacheHit).not.toHaveBeenCalled();
+
+      await collectEvents(engine.streamPipeline(["a"], "input"));
+      expect(onCacheHit).toHaveBeenCalledWith("a", expect.any(String));
+    });
+
+    it("should emit error event and throw when an agent fails", async () => {
+      config.agents.fail = makeAgent({ name: "fail" });
+      config.provider.stream = async function* () {
+        throw new Error("stream boom");
+      };
+      engine = new ExecutionEngine(config);
+
+      const events: PipelineStreamEvent[] = [];
+      await expect(async () => {
+        for await (const ev of engine.streamPipeline(["fail"], "input")) {
+          events.push(ev);
+        }
+      }).rejects.toThrow("stream boom");
+
+      const errorEvent = events.find((e) => e.type === "error");
+      expect(errorEvent).toBeDefined();
+      expect(
+        errorEvent!.type === "error" && errorEvent!.agent,
+      ).toBe("fail");
+    });
+
+    it("should support buildInput option for custom input building", async () => {
+      config.agents.a = makeAgent({ name: "a", providesTags: ["StepA"] });
+      config.agents.b = makeAgent({ name: "b", invalidatesTags: ["StepA"] });
+
+      let bReceivedInput: string | undefined;
+      config.provider.stream = async function* (params) {
+        if (params.messages[0]?.content?.startsWith("custom:")) {
+          bReceivedInput = params.messages[0].content;
+        }
+        yield { type: "text_delta", text: "out" } as StreamEvent;
+        yield { type: "complete" } as StreamEvent;
+      };
+      engine = new ExecutionEngine(config);
+
+      await collectEvents(
+        engine.streamPipeline(["a", "b"], "initial", {
+          buildInput: (name, prevResults, init) => {
+            if (Object.keys(prevResults).length === 0) return init;
+            return `custom: ${Object.values(prevResults).map((r) => r.raw).join(", ")}`;
+          },
+        }),
+      );
+
+      expect(bReceivedInput).toBe("custom: out");
+    });
+
+    it("should call onStepComplete for each agent", async () => {
+      config.agents.a = makeAgent({ name: "a" });
+      config.agents.b = makeAgent({ name: "b" });
+      engine = new ExecutionEngine(config);
+
+      const onStep = vi.fn();
+      await collectEvents(
+        engine.streamPipeline(["a", "b"], "input", {
+          onStepComplete: onStep,
+        }),
+      );
+
+      expect(onStep).toHaveBeenCalledTimes(2);
+      expect(onStep).toHaveBeenCalledWith(
+        "a",
+        expect.objectContaining({ agentName: "a" }),
+      );
+      expect(onStep).toHaveBeenCalledWith(
+        "b",
+        expect.objectContaining({ agentName: "b" }),
+      );
+    });
+
+    it("should include complete event with all results and timing", async () => {
+      config.agents.a = makeAgent({ name: "a" });
+      engine = new ExecutionEngine(config);
+
+      const events = await collectEvents(
+        engine.streamPipeline(["a"], "input"),
+      );
+
+      const complete = events.find((e) => e.type === "complete");
+      expect(complete).toBeDefined();
+      if (complete?.type === "complete") {
+        expect(complete.results.a).toBeDefined();
+        expect(complete.totalDurationMs).toBeGreaterThanOrEqual(0);
+        expect(complete.totalUsage).toBeDefined();
+      }
     });
   });
 });

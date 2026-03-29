@@ -1,7 +1,7 @@
 {
-  "name": "@reactive-agents/core",
+  "name": "@reactive-agent/core",
   "version": "0.1.0",
-  "description": "RTK Query for AI Agents — core engine",
+  "description": "RTK Query for AI Agents — core engine with tag-based DAG orchestration and smart caching",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -16,11 +16,21 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsup",
+    "prepublishOnly": "pnpm build",
     "test": "vitest run",
     "dev": "tsup --watch"
   },
-  "keywords": ["ai", "agents", "llm", "cache", "pipeline", "dag"],
+  "keywords": ["ai", "agents", "llm", "cache", "pipeline", "dag", "orchestration", "streaming"],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sol-dev-44/reactive-agents.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/sol-dev-44/reactive-agents#readme",
+  "bugs": {
+    "url": "https://github.com/sol-dev-44/reactive-agents/issues"
+  },
   "devDependencies": {
     "typescript": "^5.7.0",
     "tsup": "^8.4.0",

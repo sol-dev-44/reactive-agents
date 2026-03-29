@@ -13,6 +13,8 @@ export type {
   ExecutionStep,
   PipelineOptions,
   PipelineResult,
+  PipelineStreamEvent,
+  PipelineStreamOptions,
   Provider,
   ProviderExecuteParams,
   ProviderExecuteResult,

@@ -1,7 +1,7 @@
 {
-  "name": "@reactive-agents/anthropic",
+  "name": "@reactive-agent/anthropic",
   "version": "0.1.0",
-  "description": "Anthropic Claude adapter for ReactiveAgents",
+  "description": "Anthropic Claude provider adapter for ReactiveAgents",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -16,14 +16,24 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsup",
+    "prepublishOnly": "pnpm build",
     "test": "vitest run"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sol-dev-44/reactive-agents.git",
+    "directory": "packages/anthropic"
+  },
+  "homepage": "https://github.com/sol-dev-44/reactive-agents#readme",
+  "bugs": {
+    "url": "https://github.com/sol-dev-44/reactive-agents/issues"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0"
   },
   "peerDependencies": {
-    "@reactive-agents/core": "workspace:*"
+    "@reactive-agent/core": "^0.1.0"
   },
   "devDependencies": {
     "@reactive-agents/core": "workspace:*",

@@ -301,6 +301,13 @@ export interface AgentApi {
     options?: PipelineOptions,
   ): Promise<PipelineResult>;
 
+  /** Execute a pipeline with streaming — yields events for each agent */
+  streamPipeline(
+    agentNames: string[],
+    initialInput: unknown,
+    options?: PipelineStreamOptions,
+  ): AsyncIterable<PipelineStreamEvent>;
+
   /** Get the execution plan without running it */
   getExecutionPlan(agentNames: string[]): ExecutionPlan;
 
@@ -346,4 +353,38 @@ export interface PipelineResult {
 
   /** Cumulative token usage */
   totalUsage: TokenUsage;
+}
+
+// ============================================================
+// PIPELINE STREAMING
+// ============================================================
+
+/** Events emitted by streamPipeline() */
+export type PipelineStreamEvent =
+  | { type: "plan"; plan: ExecutionPlan }
+  | { type: "wave_start"; wave: number; agents: string[] }
+  | { type: "agent_start"; agent: string }
+  | { type: "text_delta"; agent: string; text: string }
+  | { type: "cache_hit"; agent: string; result: AgentResult<unknown> }
+  | { type: "agent_complete"; agent: string; result: AgentResult<unknown> }
+  | { type: "wave_complete"; wave: number }
+  | {
+      type: "complete";
+      results: Record<string, AgentResult<unknown>>;
+      totalUsage: TokenUsage;
+      totalDurationMs: number;
+    }
+  | { type: "error"; agent?: string; error: Error };
+
+/** Options for streamPipeline() */
+export interface PipelineStreamOptions extends PipelineOptions {
+  /**
+   * Custom input builder for each agent. Receives agent name, all previous
+   * results, and the initial input. If omitted, uses chainOutputs behavior.
+   */
+  buildInput?: (
+    agentName: string,
+    previousResults: Record<string, AgentResult<unknown>>,
+    initialInput: unknown,
+  ) => unknown;
 }
