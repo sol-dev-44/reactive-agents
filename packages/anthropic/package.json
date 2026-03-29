@@ -36,7 +36,7 @@
     "@reactive-agent/core": "^0.1.0"
   },
   "devDependencies": {
-    "@reactive-agents/core": "workspace:*",
+    "@reactive-agent/core": "workspace:*",
     "typescript": "^5.7.0",
     "tsup": "^8.4.0",
     "vitest": "^3.0.0"
